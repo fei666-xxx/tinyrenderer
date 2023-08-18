@@ -23,7 +23,16 @@ TGAColor& TGAColor::operator * (float t)
 {
     for(int i=0;i<3;i++)
     {
-        this->bgra[i] = std::uint8_t(this->bgra[i]*t);
+        this->bgra[i] = std::uint8_t(std::min<int>(255,(int)this->bgra[i]*t));
+    }
+    return *this;
+}
+
+TGAColor& TGAColor::operator + (const TGAColor& c)
+{
+    for(int i=0;i<3;i++)
+    {
+        this->bgra[i] =std::min(255,(int)this->bgra[i]+(int)c.bgra[i]);
     }
     return *this;
 }

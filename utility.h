@@ -16,4 +16,6 @@ Matrix RotateXToM(float angle);
 Matrix RotateYToM(float angle);
 Matrix RotateZToM(float angle);
 
+Matrix ViewTrans(Vec3f pos, Vec3f lookat);
+
 #endif

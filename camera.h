@@ -40,7 +40,7 @@ private:
     float FOV;
 
 public:
-    PerspCamera(Vec3f pos_, Vec3f lookat_, float FOV_=45, float near_=-0.1, float far_=-500, float aspect_=1);
+    PerspCamera(Vec3f pos_, Vec3f lookat_, float FOV_=45.0, float near_=-0.1, float far_=-500, float aspect_=1);
     virtual Matrix ProjectTrans();
 };
 

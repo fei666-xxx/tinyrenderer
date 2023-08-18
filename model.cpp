@@ -155,3 +155,35 @@ Matrix Model::ModelTrans()
            RotateZToM(transform.rotation[2]) * 
            ScaleToM(transform.scale);
 }
+
+TGAColor Model::GetTexel(Vec3f u_v)
+{
+    return diffuseMap.get(u_v.x*diffuseMap.width(),u_v.y*diffuseMap.height());
+}
+Vec3f Model::GetNormal(int iface, int nthvert)
+{
+    return normals_[normal_idx_[iface][nthvert]];
+}
+Vec3f Model::GetNormal(Vec3f u_v)
+{
+    Vec2i uvn(u_v.x*normalMap.width(),u_v.y*normalMap.height());
+    TGAColor c = normalMap.get(uvn[0],uvn[1]);
+    Vec3f res;
+    for(int i=0;i<3;i++) res.raw[2-i] = (float)c[i]/255.f*2.f - 1.f;
+    return res.normalize();
+}
+Vec3f Model::GetUV(int iface, int nthvert)
+{
+    Vec3f u_v = this->tex_coords_[uv_[iface][nthvert]];
+    u_v.x = 1-u_v.x;
+    u_v.y = 1-u_v.y;
+    return u_v;
+}
+Vec3f Model::GetVert(int iface, int nthvert)
+{
+    return verts_[faces_[iface][nthvert]];
+}
+float Model::GetSpecular(Vec3f u_v)
+{
+    return specularMap.get(u_v.x*specularMap.width(),u_v.y*specularMap.height()).bgra[0]*1.0f;
+}

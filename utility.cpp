@@ -63,3 +63,20 @@ Matrix RotateZToM(float angle)
     rotateZ[3][3] = 1;
     return rotateZ;
 }
+Matrix ViewTrans(Vec3f pos, Vec3f lookat)
+{
+    Vec3f _z = (lookat*-1).normalize();
+    Vec3f _x = (_z ^ Vec3f(0,1,0) ).normalize();
+    Vec3f _y = (_x ^ _z).normalize();
+
+    Matrix viewTrans;
+    for(int i=0;i<3;i++)
+    {
+        viewTrans[i][0] = _x[i];
+        viewTrans[i][1] = _y[i];
+        viewTrans[i][2] = _z[i];
+        viewTrans[i][3] = pos[i];
+    }
+    viewTrans[3][3] = 1;
+    return viewTrans.inverse();
+}

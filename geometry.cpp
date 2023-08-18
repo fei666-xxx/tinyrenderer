@@ -65,6 +65,18 @@ Vec4f Matrix::operator*(Vec4f a) {
     return result;
 }
 
+Vec3f Matrix::operator*(Vec3f a) {
+    assert(cols == 3);
+    Vec3f result;
+    for (int i=0; i<rows; i++) {
+        result.raw[i] = 0.f;
+        for (int j=0; j<3; j++) {
+            result.raw[i] += m[i][j] * a[j];
+        }
+    }
+    return result;
+}
+
 Matrix Matrix::transpose() {
     Matrix result(cols, rows);
     for(int i=0; i<rows; i++)
@@ -112,6 +124,25 @@ Matrix Matrix::inverse() {
         for(int j=0; j<cols; j++)
             truncate[i][j] = result[i][j+cols];
     return truncate;
+}
+
+void Matrix::SetCol(int index, const Vec4f& v)
+{
+    for(int i=0;i<4;i++) m[i][index] = v.raw[i];
+}
+
+void Matrix::SetCol(int index, const Vec3f& v)
+{
+    for(int i=0;i<3;i++) m[i][index] = v[i];
+}
+void Matrix::SetRow(int index, const Vec4f& v)
+{
+    for(int i=0;i<4;i++) m[index][i] = v.raw[i];
+}
+
+void Matrix::SetRow(int index, const Vec3f& v)
+{
+    for(int i=0;i<3;i++) m[index][i] = v[i];
 }
 
 std::ostream& operator<<(std::ostream& s, Matrix& m) {

@@ -122,8 +122,13 @@ public:
     std::vector<float>& operator[](const int i);
     Matrix operator*(const Matrix& a);
 	Vec4f operator*(Vec4f a);
+	Vec3f operator*(Vec3f a);
     Matrix transpose();
     Matrix inverse();
+	void SetCol(int index, const Vec4f& v);
+	void SetCol(int index, const Vec3f& v);
+	void SetRow(int index, const Vec4f& v);
+	void SetRow(int index, const Vec3f& v);
 
     friend std::ostream& operator<<(std::ostream& s, Matrix& m);
 };

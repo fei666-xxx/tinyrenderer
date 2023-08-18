@@ -43,6 +43,13 @@ public:
 	void LoadSpecularMap(const char* filename);
 	TGAImage& GetSpecularMap();
 	Matrix ModelTrans();
+
+	Vec3f GetVert(int iface, int nthvert);
+	TGAColor GetTexel(Vec3f u_v);
+	Vec3f GetNormal(Vec3f u_v);
+	float GetSpecular(Vec3f u_v);
+	Vec3f GetNormal(int iface, int nthvert);
+	Vec3f GetUV(int iface, int nthvert);
 };
 
 #endif

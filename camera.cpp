@@ -4,8 +4,8 @@ Camera::Camera(Vec3f pos_, Vec3f lookat_, float near_, float far_, float aspect_
                 near(near_), far(far_), aspect(aspect_), BaseObject(pos_), lookat(lookat_)
 {
     this->z_ = (lookat*-1).normalize();
-    this->x_ = (Vec3f(0,1,0) ^ z_).normalize();
-    this->y_ = (z_ ^ x_).normalize();
+    this->x_ = (z_ ^ Vec3f(0,1,0) ).normalize();
+    this->y_ = (x_ ^ z_).normalize();
 }
 
 Vec3f Camera::GetXAxis()
@@ -41,12 +41,13 @@ Matrix Camera::ViewTrans()
     Matrix viewTrans;
     for(int i=0;i<3;i++)
     {
-        viewTrans[0][i] = x_[i];
-        viewTrans[1][i] = y_[i];
-        viewTrans[2][i] = z_[i];
+        viewTrans[i][0] = x_[i];
+        viewTrans[i][1] = y_[i];
+        viewTrans[i][2] = z_[i];
+        viewTrans[i][3] = transform.position[i];
     }
     viewTrans[3][3] = 1;
-    return viewTrans * TransToM(transform.position*(-1.0));
+    return viewTrans.inverse();
 }
 
 OrthoCamera::OrthoCamera(Vec3f pos_, Vec3f lookat_, float height_, float near_, float far_, float aspect_):
@@ -65,7 +66,7 @@ PerspCamera::PerspCamera(Vec3f pos_, Vec3f lookat_, float FOV_, float near_, flo
 
 Matrix PerspCamera::ProjectTrans()
 {
-    float height = 2 * near * std::tan(FOV*PI/360.0);
+    float height = std::abs(2 * near * std::tan(FOV*PI/360.0));
     Matrix P2O;
     P2O[0][0] = near;
     P2O[1][1] = near;

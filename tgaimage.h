@@ -29,6 +29,7 @@ struct TGAColor {
     TGAColor(const std::uint8_t data1, const std::uint8_t data2, const std::uint8_t data3, const std::uint8_t data4);
     TGAColor(const std::uint8_t data1, const std::uint8_t data2, const std::uint8_t data3, const std::uint8_t data4, const std::uint8_t _bytespp);
     TGAColor& operator * (float t);
+    TGAColor& operator + (const TGAColor& c);
 };
 
 struct TGAImage {

@@ -124,40 +124,83 @@ void triangle(Vec3f* points, float* zbuffer, TGAImage& image, Shader* shader, Mo
 
 Vec3f Shader::VertexShader(int iface, int nthvert)
 {
-    Vec3f vert = model->vert(model->face(iface)[nthvert]);
-    Vec4f vert4f = (*S)*(((*PVM)*Vec4f(vert)).NormalByW());
+    Vec3f vert = model->GetVert(iface, nthvert);
+    Vec4f vert4f = (*S)*((((*P)*(*V)*(*M))*Vec4f(vert)).NormalByW());
+    //std::cout << vert4f;
 
-    tex_coords[nthvert] = model->texcoords(model->uvs(iface)[nthvert]);
-    // TGAColor c = model->GetNormalMap().get((tex_coords[nthvert].x)*model->GetNormalMap().width(),
-    //                                        (1-tex_coords[nthvert].y)*model->GetNormalMap().height());
-    // normals[nthvert] = Vec3f(c.bgra[0],c.bgra[1],c.bgra[2]).normalize();
-    // //intensity[nthvert] = normals[nthvert] * (lightPos-Vec3f(model->ModelTrans()*Vec4f(vert))).normalize();
-    // intensity[nthvert] = std::max<float>(0,normals[nthvert] * (Vec3f(3,3,0).normalize()));
+    verts[nthvert] = (*M)*Vec4f(vert);
+    tex_coords[nthvert] = model->GetUV(iface, nthvert);
+    normals[nthvert] = MIT * Vec4f(model->GetNormal(iface,nthvert),0);
 
-    intensity[nthvert] = std::max<float>(0,model->normals(model->normal_group(iface)[nthvert]) * (Vec3f(3,3,0).normalize()));
-    
-
-    return Vec3f(std::round(vert4f.x),std::round(vert4f.y),vert4f.z);
+    return Vec3f(vert4f);
 }
 
 TGAColor Shader::FragmentShader(Vec3f bary)
 {
+    Vec3f vt = verts[0]*bary[0] + verts[1]*bary[1] + verts[2]*bary[2];
     Vec3f uv = tex_coords[0]*bary[0] + tex_coords[1]*bary[1] + tex_coords[2]*bary[2];
-    Vec3f normal = normals[0]*bary[0] + normals[1]*bary[1] + normals[1]*bary[1];
-    int w = model->GetDiffuseMap().width();
-    int h = model->GetDiffuseMap().height();
-    float inten = intensity[0]*bary[0] + intensity[1]*bary[1] + intensity[2]*bary[2];
-    //return model->GetDiffuseMap().get(uv.x*w,h-uv.y*h);
-    return TGAColor(inten*255, inten*255, inten*255,255);
+    //Vec3f normal = MIT * model->GetNormal(uv);
+    Vec3f bn = (normals[0]*bary[0] + normals[1]*bary[1] + normals[2]*bary[2]).normalize();
+
+    Matrix A(3,3);
+    A.SetRow(0, verts[1]-verts[0]);
+    A.SetRow(1, verts[2]-verts[0]);
+    A.SetRow(2,bn);
+
+    Matrix AI = A.inverse();
+
+    Vec3f T = AI * Vec3f(tex_coords[1][0]-tex_coords[0][0], tex_coords[2][0]-tex_coords[0][0], 0);
+    Vec3f B = AI * Vec3f(tex_coords[1][1]-tex_coords[0][1], tex_coords[2][1]-tex_coords[0][1], 0);
+
+    Matrix C(3,3);
+    C.SetCol(0,T.normalize());
+    C.SetCol(1,B.normalize());
+    C.SetCol(2,bn);
+
+    Vec3f normal = (C * model->GetNormal(uv)).normalize();
+
+    float inten = std::max<float>(0,normal * LightDir);
+    TGAColor diffuse = model->GetTexel(uv)*inten;
+
+    TGAColor ambient(100,100,100,255);
+
+    Vec3f r = (normal * (normal * LightDir * 2) - LightDir).normalize();
+    TGAColor specular = TGAColor(255,255,255,255) * pow(std::max<float>(0,(CamereViewDir * r)), model->GetSpecular(uv));
+
+    //完成shadow mapping，计算当前像素是否在阴影中
+    Vec4f vt_shadow = (*S) * (((*M2S) * Vec4f(vt)).NormalByW());
+    int idx = int(vt_shadow.x) + int(vt_shadow.y)*800;
+    float dd = shadowbuffer[idx];
+    //std::cout << dd << " " << vt_shadow.z << "\n";
+    float shadow = 0.3 + 0.7*(shadowbuffer[idx]<vt_shadow.z+0.02);
+    //float shadow=1;
+    // if(shadow>0.8) return TGAColor(255,255,255,255);
+    // return TGAColor(255,0,0,255);
+    return ambient*0.00 + (diffuse*1.2 + specular*0.2)*shadow;
+    //return diffuse;
+    //return TGAColor(255,255,255,255)*inten;
 }
 
-void Shader::SetPVM(Matrix* PVM)
+void Shader::SetM(Matrix* M)
 {
-    this->PVM = PVM;
+    this->M = M;
+    this->MIT = (*M).inverse().transpose();
+}
+void Shader::SetV(Matrix* V)
+{
+    this->V = V;
+}
+void Shader::SetP(Matrix* P)
+{
+    this->P = P;
 }
 void Shader::SetS(Matrix* S)
 {
     this->S = S;
+}
+void Shader::SetM2S(Matrix* M2S)
+{
+    this->M2S = M2S;
 }
 void Shader::SetModel(Model* model)
 {
@@ -167,27 +210,79 @@ void Shader::SetLightPos(Vec3f p)
 {
     lightPos = p;
 }
-void Shader::SetCameraPos(Vec3f p)
+void Shader::SetViewDir(Vec3f p)
 {
-    cameraPos = p;
+    CamereViewDir = p;
+}
+void Shader::SetLightDir(Vec3f p)
+{
+    LightDir = p;
+}
+void Shader::SetShadowBuffer(float* s)
+{
+    shadowbuffer = s;
 }
 
-Renderer::Renderer(int width_, int height_, TGAImage::Format color_):image(width_,height_,color_), width(width_), height(height_)
+Renderer::Renderer(int width_, int height_, TGAImage::Format color_):image(width_,height_,color_), 
+                                                                    shadow(width_,height_,color_),
+                                                                    width(width_), height(height_)
 {
     zbuffer = new float[width_*height_];
     for(int i=0;i<width_*height_;i++) zbuffer[i] = std::numeric_limits<float>::lowest();
+    shadowbuffer = new float[width_*height_];
+    for(int i=0;i<width_*height_;i++) shadowbuffer[i] = std::numeric_limits<float>::lowest();
+}
+
+void Renderer::RenderShadow(Model* model, Shader* shadow_shader)
+{
+    //shadow pass
+    Matrix M = model->ModelTrans();
+    Matrix V = ViewTrans(light->transform.position, light->LightDir*-1);
+    Matrix P = camera->ProjectTrans();
+    Matrix S = ScreenTrans();
+
+    shadow_shader->SetM(&M);
+    shadow_shader->SetV(&V);
+    shadow_shader->SetP(&P);
+    shadow_shader->SetS(&S);
+    shadow_shader->SetModel(model);
+    shadow_shader->SetLightPos(light->transform.position);
+    shadow_shader->SetLightDir(light->LightDir.normalize());
+    shadow_shader->SetViewDir(light->LightDir.normalize());
+
+    for(int i=0;i<model->nfaces();i++)
+    {
+        Vec3f points[3];
+
+        for(int j=0;j<3;j++)
+        {
+            points[j] = shadow_shader->VertexShader(i,j);
+        }
+        triangle(points,shadowbuffer,shadow,shadow_shader,model);
+    }
 }
 
 void Renderer::Render(Model* model, Shader* shader)
 {
-    Matrix PVM = PVTrans() * model->ModelTrans();
+    Matrix M = model->ModelTrans();
+    Matrix V = camera->ViewTrans();
+    Matrix P = camera->ProjectTrans();
     Matrix S = ScreenTrans();
+    Matrix m2s = P*ViewTrans(light->transform.position, light->LightDir*-1);
+    Vec3f viewdir = camera->transform.position;
 
-    shader->SetPVM(&PVM);
+
+    shader->SetM(&M);
+    shader->SetV(&V);
+    shader->SetP(&P);
     shader->SetS(&S);
     shader->SetModel(model);
     shader->SetLightPos(light->transform.position);
-    shader->SetCameraPos(camera->transform.position);
+    shader->SetLightDir(light->LightDir.normalize());
+    shader->SetViewDir(viewdir.normalize());
+    shader->SetM2S(&m2s);
+    shader->SetShadowBuffer(shadowbuffer);
+
 
     for(int i=0;i<model->nfaces();i++)
     {
@@ -197,6 +292,7 @@ void Renderer::Render(Model* model, Shader* shader)
         {
             points[j] = shader->VertexShader(i,j);
         }
+
         triangle(points,zbuffer,image,shader,model);
     }
 }
@@ -221,15 +317,15 @@ Matrix Renderer::ScreenTrans()
     return screenTrans;
 }
 
-Matrix Renderer::PVTrans()
-{
-    return camera->ProjectTrans() * camera->ViewTrans();
-}
-
 void Renderer::Save(const char* filename)
 {
-    image.flip_vertically();
+    //image.flip_vertically();
     image.write_tga_file(filename);
+    shadow.write_tga_file("E:\\mixed\\TinyRenderer\\shadow.tga");
+    // for(int i=0;i<800*800;i++)
+    // {
+    //     if(shadowbuffer[i]>-3)std::cout << shadowbuffer[i] << "\n";
+    // }
 }
 
 Renderer::~Renderer()
@@ -237,4 +333,21 @@ Renderer::~Renderer()
     delete camera;
     delete light;
     delete[] zbuffer;
+    delete[] shadowbuffer;
+}
+
+Vec3f ShadowShader::VertexShader(int iface, int nthvert)
+{
+    Vec3f vert = model->GetVert(iface, nthvert);
+    Vec4f vert4f = (*S)*((((*P)*(*V)*(*M))*Vec4f(vert)).NormalByW());
+
+    verts[nthvert] = vert4f;
+
+    return Vec3f(vert4f);
+}
+
+TGAColor ShadowShader::FragmentShader(Vec3f bary)
+{
+    Vec3f vt = verts[0]*bary[0] + verts[1]*bary[1] + verts[2]*bary[2];
+    return TGAColor(255,255,255,255) * ((vt.z+1.0)*0.5);
 }
